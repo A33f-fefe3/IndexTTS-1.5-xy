@@ -85,7 +85,7 @@ def preprocess_audio(input_path: str, duration_sec: float = 8.0) -> str:
     # 获取输入文件的基本名称
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     # 构建输出文件名，添加预处理标记
-    output_file = os.path.join(os.getcwd(), f"{base_name}_processed.wav")
+    output_file = os.path.join(os.getcwd(), f"裁切_{base_name}.wav")
     
     segment.export(output_file, format="wav")
     log_message(f"预处理音频: {output_file}")
@@ -318,8 +318,8 @@ if __name__ == "__main__":
             is_fp16=True,
             use_cuda_kernel=False
         )
-        input_path = "测试频段.txt"
-        audio_prompt_path = "配音木城.mp3"
+        input_path = "book/测试频段.txt"
+        audio_prompt_path = "audio_prompt/配音木城.mp3"
         base_name = os.path.splitext(os.path.basename(input_path))[0]
         output_path = f"{base_name}/{base_name}.wav"
         
@@ -329,7 +329,7 @@ if __name__ == "__main__":
             output_path=output_path,
             tts=tts,
             apply_denoise=False,
-            audio_duration=40   
+            audio_duration=50   
         )
         
         if output_files:
