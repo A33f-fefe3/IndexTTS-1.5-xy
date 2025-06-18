@@ -170,6 +170,28 @@ def read_txt_file(txt_path: str) -> str:
     log_message("使用支持的编码读取TXT文件失败", "ERROR")
     return ""
 
+def find_existing_audio_chunks(output_path: str) -> List[int]:
+    """查找已存在的音频块文件并返回它们的序号列表"""
+    directory = os.path.dirname(output_path)
+    base_name = os.path.basename(output_path)
+    pattern = re.compile(rf'^{re.escape(base_name)}\.part(\d+)\.wav$')
+    
+    existing_chunks = []
+    if os.path.exists(directory):
+        log_message(f"在目录 {directory} 中查找已存在的音频块")
+        for filename in os.listdir(directory):
+            match = pattern.match(filename)
+            if match:
+                try:
+                    part_num = int(match.group(1))
+                    existing_chunks.append(part_num)
+                except ValueError:
+                    continue
+    
+    existing_chunks.sort()
+    log_message(f"找到 {len(existing_chunks)} 个已存在的音频块: {existing_chunks}")
+    return existing_chunks
+
 def text_to_speech(text: str, audio_prompt_path: str, output_path: str, 
                   audio_duration: float = 8.0, tts: Optional[IndexTTS] = None,
                   apply_denoise: bool = True, noise_level: float = 0.5) -> List[str]:
@@ -197,15 +219,32 @@ def text_to_speech(text: str, audio_prompt_path: str, output_path: str,
     text_chunks = split_text(text)
     output_files = []
     
+    # 查找已存在的音频块
+    existing_chunks = find_existing_audio_chunks(output_path)
+    if existing_chunks:
+        last_chunk = max(existing_chunks)
+        log_message(f"找到已存在的 {len(existing_chunks)} 个音频块，将从块 {last_chunk + 1} 开始继续生成")
+    else:
+        log_message("未找到已存在的音频块，将从头开始生成")
+    
     for i, chunk in enumerate(text_chunks):
+        # 如果已经存在该块，则跳过
+        if i in existing_chunks:
+            temp_output_file = f"{output_path}.part{i}.wav"
+            output_files.append(temp_output_file)
+            log_message(f"跳过已存在的音频块 {i+1}/{len(text_chunks)}: {temp_output_file}")
+            continue
+        
         temp_output_file = f"{output_path}.part{i}.wav"
+        log_message(f"开始生成音频块 {i+1}/{len(text_chunks)}: {temp_output_file}")
+        
         success = tts.infer_fast(
             audio_prompt=prompt_wav,
             text=chunk,
             output_path=temp_output_file,
-            max_text_tokens_per_sentence=120,
-            sentences_bucket_max_size=2,
-            max_mel_tokens=1024
+            max_text_tokens_per_sentence=100, #语速控制
+            sentences_bucket_max_size=8,
+            max_mel_tokens=800
         )
         
         if success:
@@ -264,7 +303,7 @@ def process_document(
     output_path: str,
     start_page: int = 0,
     end_page: Optional[int] = None,
-    audio_duration: float = 8.0,
+    audio_duration : float = 8.0,
     tts: Optional[IndexTTS] = None,
     max_batch_size_mb: float = 3800.0,
     apply_denoise: bool = True,
@@ -318,7 +357,7 @@ if __name__ == "__main__":
             is_fp16=True,
             use_cuda_kernel=False
         )
-        input_path = "book/测试频段.txt"
+        input_path = "book/蛊真人错别字修改版4.0 (蛊真人（无足鸟改错）) (Z-Library).txt"
         audio_prompt_path = "audio_prompt/配音木城.mp3"
         base_name = os.path.splitext(os.path.basename(input_path))[0]
         output_path = f"{base_name}/{base_name}.wav"
